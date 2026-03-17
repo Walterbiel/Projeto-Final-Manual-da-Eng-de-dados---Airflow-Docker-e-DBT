@@ -1,6 +1,5 @@
 name: CI — dbt Pipeline
 
-# Dispara em pushes para main e em Pull Requests
 on:
   push:
     branches: [main]
@@ -8,9 +7,6 @@ on:
     branches: [main]
 
 jobs:
-  # ─────────────────────────────────────────────
-  # Job 1: Valida sintaxe SQL sem precisar do banco
-  # ─────────────────────────────────────────────
   dbt-compile:
     name: Compilar modelos dbt (validação de sintaxe)
     runs-on: ubuntu-latest
@@ -31,23 +27,36 @@ jobs:
         working-directory: 1_local_setup
         run: uv sync
 
+      - name: Criar profiles.yml para validação
+        working-directory: 2_data_warehouse/dw_bootcamp
+        run: |
+          cat > profiles.yml << 'EOF'
+          dw_bootcamp:
+            target: dev
+            outputs:
+              dev:
+                type: postgres
+                host: localhost
+                port: 5433
+                user: postgres
+                password: postgres
+                dbname: dbt_db
+                schema: public
+                threads: 4
+          EOF
+
       - name: Instalar pacotes dbt (dbt deps)
         working-directory: 2_data_warehouse/dw_bootcamp
-        run: ../../1_local_setup/.venv/bin/dbt deps
+        run: ../../1_local_setup/.venv/bin/dbt deps --profiles-dir .
 
       - name: Validar sintaxe dos modelos dbt (dbt parse)
         working-directory: 2_data_warehouse/dw_bootcamp
-        run: ../../1_local_setup/.venv/bin/dbt parse
-        # dbt parse valida toda a sintaxe e gera o manifest.json
-        # sem precisar de profiles.yml nem conexão com banco
+        run: ../../1_local_setup/.venv/bin/dbt parse --profiles-dir .
 
-  # ─────────────────────────────────────────────
-  # Job 2: Executa o pipeline completo com PostgreSQL
-  # ─────────────────────────────────────────────
   dbt-build:
     name: Executar pipeline completo (seed + run + test)
     runs-on: ubuntu-latest
-    needs: dbt-compile  # Só roda se o Job 1 passar
+    needs: dbt-compile
 
     services:
       postgres:
@@ -62,7 +71,7 @@ jobs:
           --health-cmd "pg_isready -U postgres -d dbt_db"
           --health-interval 5s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
 
     steps:
       - name: Checkout do repositório
@@ -81,8 +90,9 @@ jobs:
         run: uv sync
 
       - name: Criar profiles.yml apontando para o PostgreSQL do CI
+        working-directory: 2_data_warehouse/dw_bootcamp
         run: |
-          cat > 2_data_warehouse/dw_bootcamp/profiles.yml << 'EOF'
+          cat > profiles.yml << 'EOF'
           dw_bootcamp:
             target: dev
             outputs:
@@ -99,23 +109,23 @@ jobs:
 
       - name: Instalar pacotes dbt (dbt deps)
         working-directory: 2_data_warehouse/dw_bootcamp
-        run: ../../1_local_setup/.venv/bin/dbt deps
+        run: ../../1_local_setup/.venv/bin/dbt deps --profiles-dir .
 
       - name: Testar conexão com o banco (dbt debug)
         working-directory: 2_data_warehouse/dw_bootcamp
-        run: ../../1_local_setup/.venv/bin/dbt debug
+        run: ../../1_local_setup/.venv/bin/dbt debug --profiles-dir .
 
       - name: Carregar dados brutos (dbt seed)
         working-directory: 2_data_warehouse/dw_bootcamp
-        run: ../../1_local_setup/.venv/bin/dbt seed
+        run: ../../1_local_setup/.venv/bin/dbt seed --profiles-dir .
 
       - name: Executar models e testes (dbt build)
         working-directory: 2_data_warehouse/dw_bootcamp
-        run: ../../1_local_setup/.venv/bin/dbt build --exclude-resource-type seed
+        run: ../../1_local_setup/.venv/bin/dbt build --profiles-dir . --exclude-resource-type seed
 
       - name: Gerar documentação dbt
         working-directory: 2_data_warehouse/dw_bootcamp
-        run: ../../1_local_setup/.venv/bin/dbt docs generate
+        run: ../../1_local_setup/.venv/bin/dbt docs generate --profiles-dir .
 
       - name: Publicar artefatos de documentação
         uses: actions/upload-artifact@v4
