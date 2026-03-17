@@ -31,30 +31,15 @@ jobs:
         working-directory: 1_local_setup
         run: uv sync
 
-      - name: Criar profiles.yml para compilação (sem banco real)
-        run: |
-          cat > 2_data_warehouse/dw_bootcamp/profiles.yml << 'EOF'
-          dw_bootcamp:
-            target: dev
-            outputs:
-              dev:
-                type: postgres
-                host: localhost
-                port: 5433
-                user: postgres
-                password: postgres
-                dbname: dbt_db
-                schema: public
-                threads: 4
-          EOF
-
       - name: Instalar pacotes dbt (dbt deps)
         working-directory: 2_data_warehouse/dw_bootcamp
         run: ../../1_local_setup/.venv/bin/dbt deps
 
-      - name: Compilar modelos dbt (dbt compile)
+      - name: Validar sintaxe dos modelos dbt (dbt parse)
         working-directory: 2_data_warehouse/dw_bootcamp
-        run: ../../1_local_setup/.venv/bin/dbt compile
+        run: ../../1_local_setup/.venv/bin/dbt parse
+        # dbt parse valida toda a sintaxe e gera o manifest.json
+        # sem precisar de profiles.yml nem conexão com banco
 
   # ─────────────────────────────────────────────
   # Job 2: Executa o pipeline completo com PostgreSQL

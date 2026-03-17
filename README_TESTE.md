@@ -1323,9 +1323,9 @@ Push / Pull Request
         │
         ▼
 ┌─────────────────────────┐
-│ Job 1: dbt-compile      │  ← Valida sintaxe SQL (~2 min)
+│ Job 1: dbt-compile      │  ← Valida sintaxe SQL (~2 min, sem banco)
 │  • dbt deps             │
-│  • dbt compile          │
+│  • dbt parse            │
 └────────────┬────────────┘
              │ (só continua se passar)
              ▼
@@ -1380,33 +1380,16 @@ jobs:
         run: uv sync
         # Lê o pyproject.toml e instala dbt-core, dbt-postgres, etc.
 
-      - name: Criar profiles.yml para compilação (sem banco real)
-        run: |
-          cat > 2_data_warehouse/dw_bootcamp/profiles.yml << 'EOF'
-          dw_bootcamp:
-            target: dev
-            outputs:
-              dev:
-                type: postgres
-                host: localhost
-                port: 5433
-                user: postgres
-                password: postgres
-                dbname: dbt_db
-                schema: public
-                threads: 4
-          EOF
-        # O profiles.yml não está no repositório — criamos aqui dinamicamente
-
       - name: Instalar pacotes dbt (dbt deps)
         working-directory: 2_data_warehouse/dw_bootcamp
         run: ../../1_local_setup/.venv/bin/dbt deps
         # Chama o dbt do venv criado pelo uv sync
 
-      - name: Compilar modelos dbt (dbt compile)
+      - name: Validar sintaxe dos modelos dbt (dbt parse)
         working-directory: 2_data_warehouse/dw_bootcamp
-        run: ../../1_local_setup/.venv/bin/dbt compile
-        # dbt compile gera o SQL final sem executar — valida toda a sintaxe
+        run: ../../1_local_setup/.venv/bin/dbt parse
+        # dbt parse valida toda a sintaxe e gera o manifest.json
+        # sem precisar de profiles.yml nem conexão com banco
 
   # ─────────────────────────────────────────────────────
   # Job 2: Build completo — executa contra PostgreSQL real
@@ -1583,9 +1566,9 @@ git commit -m "ci: adiciona workflow do GitHub Actions"
 git push
 ```
 
-#### Job 1 falha em `dbt compile`
+#### Job 1 falha em `dbt parse`
 
-**Causa:** Erro de sintaxe em um modelo SQL.
+**Causa:** Erro de sintaxe em um modelo SQL (referência inválida, `{{ ref() }}` errado, YAML malformado).
 
 **Solução:** Leia o log de erro na aba Actions — ele mostra o arquivo e a linha exata. Corrija localmente, commit e push.
 
