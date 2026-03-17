@@ -1,0 +1,140 @@
+name: CI — dbt Pipeline
+
+# Dispara em pushes para main e em Pull Requests
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Job 1: Valida sintaxe SQL sem precisar do banco
+  # ─────────────────────────────────────────────
+  dbt-compile:
+    name: Compilar modelos dbt (validação de sintaxe)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Instalar UV
+        run: pip install uv
+
+      - name: Instalar dependências Python
+        working-directory: 1_local_setup
+        run: uv sync
+
+      - name: Criar profiles.yml para compilação (sem banco real)
+        run: |
+          cat > 2_data_warehouse/dw_bootcamp/profiles.yml << 'EOF'
+          dw_bootcamp:
+            target: dev
+            outputs:
+              dev:
+                type: postgres
+                host: localhost
+                port: 5433
+                user: postgres
+                password: postgres
+                dbname: dbt_db
+                schema: public
+                threads: 4
+          EOF
+
+      - name: Instalar pacotes dbt (dbt deps)
+        working-directory: 2_data_warehouse/dw_bootcamp
+        run: ../../1_local_setup/.venv/bin/dbt deps
+
+      - name: Compilar modelos dbt (dbt compile)
+        working-directory: 2_data_warehouse/dw_bootcamp
+        run: ../../1_local_setup/.venv/bin/dbt compile
+
+  # ─────────────────────────────────────────────
+  # Job 2: Executa o pipeline completo com PostgreSQL
+  # ─────────────────────────────────────────────
+  dbt-build:
+    name: Executar pipeline completo (seed + run + test)
+    runs-on: ubuntu-latest
+    needs: dbt-compile  # Só roda se o Job 1 passar
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dbt_db
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dbt_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Instalar UV
+        run: pip install uv
+
+      - name: Instalar dependências Python
+        working-directory: 1_local_setup
+        run: uv sync
+
+      - name: Criar profiles.yml apontando para o PostgreSQL do CI
+        run: |
+          cat > 2_data_warehouse/dw_bootcamp/profiles.yml << 'EOF'
+          dw_bootcamp:
+            target: dev
+            outputs:
+              dev:
+                type: postgres
+                host: localhost
+                port: 5433
+                user: postgres
+                password: postgres
+                dbname: dbt_db
+                schema: public
+                threads: 4
+          EOF
+
+      - name: Instalar pacotes dbt (dbt deps)
+        working-directory: 2_data_warehouse/dw_bootcamp
+        run: ../../1_local_setup/.venv/bin/dbt deps
+
+      - name: Testar conexão com o banco (dbt debug)
+        working-directory: 2_data_warehouse/dw_bootcamp
+        run: ../../1_local_setup/.venv/bin/dbt debug
+
+      - name: Carregar dados brutos (dbt seed)
+        working-directory: 2_data_warehouse/dw_bootcamp
+        run: ../../1_local_setup/.venv/bin/dbt seed
+
+      - name: Executar models e testes (dbt build)
+        working-directory: 2_data_warehouse/dw_bootcamp
+        run: ../../1_local_setup/.venv/bin/dbt build --exclude-resource-type seed
+
+      - name: Gerar documentação dbt
+        working-directory: 2_data_warehouse/dw_bootcamp
+        run: ../../1_local_setup/.venv/bin/dbt docs generate
+
+      - name: Publicar artefatos de documentação
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-docs
+          path: 2_data_warehouse/dw_bootcamp/target/
+          retention-days: 7

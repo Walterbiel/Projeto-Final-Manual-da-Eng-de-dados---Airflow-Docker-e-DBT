@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/Walter/Documents/Comunidados/projeto_final_engenharia/2_data_warehouse/dw_bootcamp -type f \\\\\\(-name *.sql -o -name *.py \\\\\\) ! -path */dbt_packages/*)"
+    ]
+  }
+}

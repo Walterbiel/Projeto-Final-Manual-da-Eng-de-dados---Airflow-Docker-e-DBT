@@ -1,0 +1,29 @@
+name: 'dw_bootcamp'
+version: '1.0.0'
+
+profile: 'dw_bootcamp'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+vars:
+    "dbt_date:time_zone": "America/Sao_Paulo"
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  dw_bootcamp:
+    staging:
+      +materialized: view
+    
+    intermediate:
+      +materialized: table
+    
+    mart:
+      +materialized: table

@@ -1,0 +1,14 @@
+[project]
+name = "1-local-setup"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "dbt-core>=1.10.15",
+    "dbt-postgres>=1.9.1",
+    "duckdb>=1.4.3",
+    "faker>=38.2.0",
+    "numpy>=2.3.5",
+    "pandas>=2.3.3",
+]

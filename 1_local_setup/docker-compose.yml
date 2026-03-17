@@ -1,0 +1,20 @@
+services:                          # Define os serviços (containers) que serão executados
+  postgres:                        # Nome lógico do serviço (usado no docker-compose)
+    image: postgres:17         # Imagem Docker oficial do PostgreSQL, usando a versão 17
+    container_name: dbt_postgres   # Nome fixo do container para facilitar identificação e uso
+    environment:                   # Variáveis de ambiente passadas para o container
+      POSTGRES_USER: ${DBT_USER}   # Usuário do banco, lido de uma variável de ambiente (.env)
+      POSTGRES_PASSWORD: ${DBT_PASSWORD} # Senha do banco, também vinda do .env
+      POSTGRES_DB: dbt_db          # Nome do banco de dados que será criado ao iniciar o container
+    ports:                         # Mapeamento de portas entre host e container
+      - "5433:5432"                # Porta 5433 no host aponta para a 5432 dentro do container (colocar 5433 pra envitar conflito com airflow)
+    volumes:                       # Volumes persistentes associados ao container
+      - postgres_data:/var/lib/postgresql/data # Persistência dos dados do Postgres fora do container
+    healthcheck:                   # Verificação de saúde do container
+      test: ["CMD-SHELL", "pg_isready -U ${DBT_USER} -d dbt_db"] # Testa se o banco está pronto para conexões
+      interval: 5s                 # Intervalo entre verificações de saúde
+      timeout: 5s                  # Tempo máximo de espera para cada verificação
+      retries: 5                   # Quantidade de tentativas antes de marcar como unhealthy
+
+volumes:                           # Definição dos volumes Docker
+  postgres_data:                   # Volume nomeado usado para persistir os dados do PostgreSQL
