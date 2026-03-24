@@ -421,6 +421,36 @@ cd 2_data_warehouse/dw_bootcamp
 dbt debug
 ```
 
+caso erro
+```bash
+@"
+name: 'dw_bootcamp'
+version: '1.0.0'
+profile: 'dw_bootcamp'
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+vars:
+  "dbt_date:time_zone": "America/Sao_Paulo"
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  dw_bootcamp:
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: table
+    mart:
+      +materialized: table
+"@ | Set-Content -Path "dbt_project.yml" -Encoding UTF8NoBOM
+```
+
 O `dbt debug` verifica:
 - Se o `profiles.yml` foi encontrado
 - Se as credenciais estão corretas
